@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"math/rand"
 	"sort"
 	"time"
@@ -20,22 +21,36 @@ type Point struct {
 }
 
 func randomDuration(task TaskEstimate) int {
-	// Simple Triangular distribution
-	bestToMostLikely := rand.Intn(task.MostLikely-task.BestCase+1) + task.BestCase
-	mostLikelyToWorst := rand.Intn(task.WorstCase-task.MostLikely+1) + task.MostLikely
-	return (bestToMostLikely + mostLikelyToWorst) / 2
+	// Use a triangular distribution
+	bestCase := float64(task.BestCase)
+	mostLikely := float64(task.MostLikely)
+	worstCase := float64(task.WorstCase)
+
+	u := rand.Float64()
+	if u < (mostLikely-bestCase)/(worstCase-bestCase) {
+		return int(bestCase + math.Sqrt(u*(worstCase-bestCase)*(mostLikely-bestCase)))
+	} else {
+		return int(worstCase - math.Sqrt((1-u)*(worstCase-bestCase)*(worstCase-mostLikely)))
+	}
 }
 
 func calculatePercentiles(results []int) []Point {
 	sortedResults := append([]int(nil), results...)
 	sort.Ints(sortedResults)
 
-	points := make([]Point, 101)
-	for i := 0; i <= 100; i++ {
-		index := int(float64(i) / 100.0 * float64(len(sortedResults)-1))
-		points[i] = Point{
-			Days:       sortedResults[index],
-			Percentage: float64(i),
+	maxDays := sortedResults[len(sortedResults)-1]
+	points := make([]Point, maxDays+1)
+
+	for day := 0; day <= maxDays; day++ {
+		count := 0
+		for _, result := range sortedResults {
+			if result <= day {
+				count++
+			}
+		}
+		points[day] = Point{
+			Days:       day,
+			Percentage: float64(count) / float64(len(sortedResults)) * 100,
 		}
 	}
 	return points
